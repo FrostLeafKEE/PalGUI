@@ -6,9 +6,9 @@
 
 ### 服务器控制
 - 启动/关闭 PalServer，实时控制台输出
-- SteamCMD 一键更新服务端
-- 存档备份（手动 + 自动定时备份）
-- 右侧实时显示 CPU/内存/进程占用
+- SteamCMD 自动检测 + 一键更新服务端
+- 存档备份（手动备份 + 自动定时备份）
+- 右侧实时显示 CPU / 内存 / 进程占用
 
 ### 玩家列表
 - 通过 RCON 查看在线玩家
@@ -19,6 +19,7 @@
 - 可视化编辑 PalWorldSettings.ini
 - 所有配置项分组展示，中文标注
 - 支持滑块和数值输入
+- 兼容游戏标准单行配置格式
 
 ## 快速开始
 
@@ -44,7 +45,7 @@ pyinstaller PalGUI.spec
 
 ```
 PalGUI/
-── main.py
+├── main.py
 ├── app/
 │   ├── main_window.py     # 主窗口
 │   ├── server_tab.py      # 服务器控制 + 备份 + 资源监控
@@ -54,7 +55,7 @@ PalGUI/
 │   ├── server_process.py  # 进程管理
 │   ├── config_manager.py  # 配置文件读写
 │   ├── config_schema.py   # 配置项定义
-│   └── theme.py           # 样式表
+│   ── theme.py           # 样式表
 ├── PalGUI.spec
 └── requirements.txt
 ```
