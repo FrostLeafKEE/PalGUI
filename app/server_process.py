@@ -85,28 +85,13 @@ class ServerProcess(QObject):
     # ---- 停止 ----
 
     def stop(self) -> None:
-        """优雅地停止服务端。
-
-        策略：
-        1. 先发送 terminate()（相当于 WM_CLOSE / SIGTERM）
-        2. 等待 5 秒
-        3. 如果仍未退出，发送 kill()
-        4. 再等待 2 秒
-        5. 如果仍未退出，强制终止
-        """
         if not self._running or self._process is None:
             return
 
-        # 优雅终止
-        self._process.terminate()
-
-        # 5 秒后检查，如果没退出则强杀
-        if not self._process.waitForFinished(5000):
-            self._process.kill()
-            if not self._process.waitForFinished(2000):
-                # 极端情况：强制关闭
-                self._process.close()
-                self._on_stopped(-1)
+        self._process.kill()
+        if not self._process.waitForFinished(3000):
+            self._process.close()
+            self._on_stopped(-1)
 
     # ---- 内部槽函数 ----
 
