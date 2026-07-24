@@ -438,8 +438,8 @@ class ServerTab(QWidget):
         title.setStyleSheet("font-size: 14px; font-weight: 700; color: #a5a8c0; padding-bottom: 4px;")
         layout.addWidget(title)
 
-        layout.addWidget(self._make_card("CPU", "cpuBar", "cpu_label"))
-        layout.addWidget(self._make_card("内存", "memBar", "mem_label"))
+        layout.addWidget(self._make_card("CPU", "cpu_bar", "cpu_label"))
+        layout.addWidget(self._make_card("内存", "mem_bar", "mem_label"))
 
         layout.addWidget(QLabel())  # spacer
 
@@ -447,7 +447,7 @@ class ServerTab(QWidget):
         proc_title.setStyleSheet("font-size: 13px; font-weight: 600; color: #7c9aff; padding-bottom: 4px;")
         layout.addWidget(proc_title)
 
-        layout.addWidget(self._make_card("内存占用", "procMemBar", "proc_mem_label"))
+        layout.addWidget(self._make_card("内存占用", "proc_mem_bar", "proc_mem_label"))
 
         self._proc_status = QLabel("未运行")
         self._proc_status.setStyleSheet("color: #6b6f8a; font-size: 12px;")
