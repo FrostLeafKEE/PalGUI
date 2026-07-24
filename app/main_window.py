@@ -25,8 +25,8 @@ class MainWindow(QMainWindow):
     """幻兽帕鲁开服管理工具主窗口"""
 
     WINDOW_TITLE = "幻兽帕鲁（Palworld）开服管理工具"
-    MIN_WIDTH = 1100
-    MIN_HEIGHT = 700
+    MIN_WIDTH = 1000
+    MIN_HEIGHT = 600
 
     def __init__(self):
         super().__init__()

@@ -18,6 +18,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QProcess, QTimer
 from PyQt6.QtWidgets import (
     QCheckBox,
     QFileDialog,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -25,6 +26,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTextEdit,
     QVBoxLayout,
@@ -163,7 +165,16 @@ class ServerTab(QWidget):
         self._build_backup_group(left)
         self._build_console_group(left)
 
-        root.addLayout(left, 1)
+        left_container = QWidget()
+        left_container.setLayout(left)
+        left_container.setMinimumWidth(700)
+
+        scroll = QScrollArea()
+        scroll.setWidget(left_container)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+
+        root.addWidget(scroll, 1)
         root.addWidget(self._build_resource_panel())
 
     def _build_path_group(self, parent_layout):
