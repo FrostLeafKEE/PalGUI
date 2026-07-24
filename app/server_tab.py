@@ -5,13 +5,15 @@
 - 服务器启停 Toggle 按钮与状态指示
 - SteamCMD 更新服务器（login anonymous + app_update）
 - 服务端输出实时控制台
+- 右侧系统资源监控面板
 """
 
 import os
 import shutil
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QProcess
+import psutil
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QProcess, QTimer
 from PyQt6.QtWidgets import (
     QFileDialog,
     QGroupBox,
@@ -19,6 +21,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QTextEdit,
     QVBoxLayout,
@@ -38,6 +41,9 @@ from app.theme import (
     PATH_DISPLAY_QSS,
     PATH_FOUND_QSS,
     PATH_ERROR_QSS,
+    RESOURCE_PANEL_QSS,
+    RESOURCE_CARD_QSS,
+    RESOURCE_BAR_QSS,
     STATUS_ONLINE_QSS,
     STATUS_OFFLINE_QSS,
 )
@@ -77,6 +83,7 @@ class ServerTab(QWidget):
 
         self._setup_ui()
         self._connect_signals()
+        self._start_resource_timer()
 
     @property
     def server_path(self) -> str:
@@ -89,12 +96,70 @@ class ServerTab(QWidget):
         self._detect_steamcmd()
         self.path_changed.emit(path)
 
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-        layout.setContentsMargins(24, 20, 24, 20)
+    # ---- 资源监控 ----
 
-        # ========== 服务器路径管理 ==========
+    def _start_resource_timer(self):
+        self._resource_timer = QTimer(self)
+        self._resource_timer.timeout.connect(self._update_resource_panel)
+        self._resource_timer.start(2000)
+        self._update_resource_panel()
+
+    def _get_palserver_process(self) -> psutil.Process | None:
+        if not self._server_process.is_running():
+            return None
+        try:
+            for proc in psutil.process_iter(["pid", "name"]):
+                if proc.info["name"] and "PalServer" in proc.info["name"]:
+                    return proc
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+        return None
+
+    def _update_resource_panel(self):
+        cpu = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
+        self._cpu_bar.setValue(int(cpu))
+        self._cpu_label.setText(f"{cpu:.1f}%")
+        self._mem_bar.setValue(int(mem.percent))
+        self._mem_label.setText(f"{mem.percent:.1f}%  ({mem.used / 1073741824:.1f} / {mem.total / 1073741824:.1f} GB)")
+
+        proc = self._get_palserver_process()
+        if proc:
+            try:
+                proc_mem = proc.memory_info().rss
+                self._proc_mem_bar.setValue(min(int(proc_mem / 1073741824 * 10), 100))
+                self._proc_mem_label.setText(f"{proc_mem / 1048576:.0f} MB")
+                self._proc_status.setText("运行中")
+                self._proc_status.setStyleSheet("color: #4ade80; font-size: 12px;")
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                self._proc_mem_label.setText("--")
+                self._proc_status.setText("未找到")
+                self._proc_status.setStyleSheet("color: #6b6f8a; font-size: 12px;")
+        else:
+            self._proc_mem_bar.setValue(0)
+            self._proc_mem_label.setText("--")
+            self._proc_status.setText("未运行")
+            self._proc_status.setStyleSheet("color: #6b6f8a; font-size: 12px;")
+
+    # ---- UI 构建 ----
+
+    def _setup_ui(self):
+        root = QHBoxLayout(self)
+        root.setSpacing(16)
+        root.setContentsMargins(24, 20, 24, 20)
+
+        left = QVBoxLayout()
+        left.setSpacing(16)
+
+        self._build_path_group(left)
+        self._build_control_group(left)
+        self._build_update_group(left)
+        self._build_console_group(left)
+
+        root.addLayout(left, 1)
+        root.addWidget(self._build_resource_panel())
+
+    def _build_path_group(self, parent_layout):
         path_group = QGroupBox("  服务器路径")
         path_layout = QVBoxLayout(path_group)
         path_layout.setSpacing(10)
@@ -128,9 +193,9 @@ class ServerTab(QWidget):
         self._lbl_exe_status.setStyleSheet("color: #6b6f8a; font-size: 12px; padding-left: 4px;")
         path_layout.addWidget(self._lbl_exe_status)
 
-        layout.addWidget(path_group)
+        parent_layout.addWidget(path_group)
 
-        # ========== 服务器控制 ==========
+    def _build_control_group(self, parent_layout):
         control_group = QGroupBox("  服务器控制")
         control_layout = QVBoxLayout(control_group)
         control_layout.setSpacing(12)
@@ -145,7 +210,7 @@ class ServerTab(QWidget):
         self._btn_toggle.setStyleSheet(BTN_START_QSS)
         self._btn_toggle.setEnabled(False)
 
-        self._lbl_status = QLabel("●  未运行")
+        self._lbl_status = QLabel("  未运行")
         self._lbl_status.setStyleSheet(STATUS_OFFLINE_QSS)
 
         control_row.addWidget(self._btn_toggle)
@@ -153,9 +218,9 @@ class ServerTab(QWidget):
         control_row.addStretch()
         control_layout.addLayout(control_row)
 
-        layout.addWidget(control_group)
+        parent_layout.addWidget(control_group)
 
-        # ========== 服务器更新（SteamCMD） ==========
+    def _build_update_group(self, parent_layout):
         update_group = QGroupBox("  服务器更新 (SteamCMD)")
         update_layout = QVBoxLayout(update_group)
         update_layout.setSpacing(12)
@@ -202,9 +267,9 @@ class ServerTab(QWidget):
         update_btn_row.addStretch()
         update_layout.addLayout(update_btn_row)
 
-        layout.addWidget(update_group)
+        parent_layout.addWidget(update_group)
 
-        # ========== 输出控制台 ==========
+    def _build_console_group(self, parent_layout):
         console_group = QGroupBox("  输出日志")
         console_layout = QVBoxLayout(console_group)
         console_layout.setSpacing(8)
@@ -225,7 +290,72 @@ class ServerTab(QWidget):
 
         console_layout.addWidget(self._console)
         console_layout.addLayout(clear_row)
-        layout.addWidget(console_group, 1)
+        parent_layout.addWidget(console_group, 1)
+
+    def _build_resource_panel(self) -> QWidget:
+        panel = QWidget()
+        panel.setObjectName("resourcePanel")
+        panel.setStyleSheet(RESOURCE_PANEL_QSS)
+        panel.setFixedWidth(240)
+
+        layout = QVBoxLayout(panel)
+        layout.setSpacing(14)
+        layout.setContentsMargins(14, 16, 14, 16)
+
+        title = QLabel("  系统资源")
+        title.setStyleSheet("font-size: 14px; font-weight: 700; color: #a5a8c0; padding-bottom: 4px;")
+        layout.addWidget(title)
+
+        layout.addWidget(self._make_card("CPU", "cpuBar", "cpu_label"))
+        layout.addWidget(self._make_card("内存", "memBar", "mem_label"))
+
+        layout.addWidget(QLabel())  # spacer
+
+        proc_title = QLabel("  服务端进程")
+        proc_title.setStyleSheet("font-size: 13px; font-weight: 600; color: #7c9aff; padding-bottom: 4px;")
+        layout.addWidget(proc_title)
+
+        layout.addWidget(self._make_card("内存占用", "procMemBar", "proc_mem_label"))
+
+        self._proc_status = QLabel("未运行")
+        self._proc_status.setStyleSheet("color: #6b6f8a; font-size: 12px;")
+        layout.addWidget(self._proc_status)
+
+        layout.addStretch()
+        return panel
+
+    def _make_card(self, label_text: str, bar_name: str, label_attr: str) -> QWidget:
+        card = QWidget()
+        card.setObjectName("resourceCard")
+        card.setProperty("class", "resourceCard")
+        card.setStyleSheet(RESOURCE_CARD_QSS)
+
+        layout = QVBoxLayout(card)
+        layout.setSpacing(6)
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        row = QHBoxLayout()
+        lbl = QLabel(label_text)
+        lbl.setStyleSheet("color: #8b8fa8; font-size: 12px;")
+        row.addWidget(lbl)
+        row.addStretch()
+        val = QLabel("--")
+        val.setStyleSheet("color: #e2e4f0; font-size: 12px; font-weight: 600;")
+        row.addWidget(val)
+        layout.addLayout(row)
+
+        bar = QProgressBar()
+        bar.setObjectName(bar_name)
+        bar.setStyleSheet(RESOURCE_BAR_QSS)
+        bar.setRange(0, 100)
+        bar.setValue(0)
+        layout.addWidget(bar)
+
+        setattr(self, f"_{label_attr}", val)
+        setattr(self, f"_{bar_name}", bar)
+        return card
+
+    # ---- 信号连接 ----
 
     def _connect_signals(self):
         self._btn_auto_find.clicked.connect(self._on_auto_find)
@@ -238,6 +368,8 @@ class ServerTab(QWidget):
         self._server_process.stopped.connect(self._on_server_stopped)
         self._server_process.output_received.connect(self._on_server_output)
         self._server_process.error_occurred.connect(self._on_server_error)
+
+    # ---- 槽函数：路径 ----
 
     @pyqtSlot()
     def _on_auto_find(self):
@@ -287,6 +419,8 @@ class ServerTab(QWidget):
             self.server_path = folder
             self._check_executable()
 
+    # ---- 槽函数：服务器启停 ----
+
     @pyqtSlot()
     def _on_toggle(self):
         if self._server_process.is_running():
@@ -328,7 +462,7 @@ class ServerTab(QWidget):
         self._btn_toggle.setEnabled(True)
         self._btn_toggle.setText("  关闭服务器")
         self._btn_toggle.setStyleSheet(BTN_STOP_QSS)
-        self._lbl_status.setText("●  运行中")
+        self._lbl_status.setText("  运行中")
         self._lbl_status.setStyleSheet(STATUS_ONLINE_QSS)
         self._append_console("服务端已启动！\n")
 
@@ -337,7 +471,7 @@ class ServerTab(QWidget):
         self._btn_toggle.setEnabled(True)
         self._btn_toggle.setText("  启动服务器")
         self._btn_toggle.setStyleSheet(BTN_START_QSS)
-        self._lbl_status.setText("●  未运行")
+        self._lbl_status.setText("  未运行")
         self._lbl_status.setStyleSheet(STATUS_OFFLINE_QSS)
         self._append_console(f"\n服务端已停止（退出码: {exit_code}）\n")
         self._check_executable()
@@ -352,8 +486,10 @@ class ServerTab(QWidget):
         self._btn_toggle.setEnabled(True)
         self._btn_toggle.setText("  启动服务器")
         self._btn_toggle.setStyleSheet(BTN_START_QSS)
-        self._lbl_status.setText("●  未运行")
+        self._lbl_status.setText("  未运行")
         self._lbl_status.setStyleSheet(STATUS_OFFLINE_QSS)
+
+    # ---- 槽函数：SteamCMD 更新 ----
 
     @pyqtSlot()
     def _on_browse_steamcmd(self):
@@ -497,6 +633,8 @@ class ServerTab(QWidget):
             text = str(data)
         if text.strip():
             self._append_console(text)
+
+    # ---- 辅助方法 ----
 
     def _detect_steamcmd(self):
         if not self._server_path:

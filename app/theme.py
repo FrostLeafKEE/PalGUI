@@ -692,3 +692,45 @@ QLineEdit {
     font-family: "Cascadia Code", "Consolas", monospace;
 }
 """
+
+RESOURCE_PANEL_QSS = """
+QWidget#resourcePanel {
+    background-color: #181a24;
+    border: 1px solid #2e3148;
+    border-radius: 12px;
+    padding: 16px 14px;
+}
+"""
+
+RESOURCE_CARD_QSS = """
+QWidget.resourceCard {
+    background-color: #13151f;
+    border: 1px solid #2e3148;
+    border-radius: 8px;
+    padding: 12px;
+}
+"""
+
+RESOURCE_BAR_QSS = """
+QProgressBar {
+    background-color: #1e2030;
+    border: none;
+    border-radius: 4px;
+    height: 8px;
+    text-align: center;
+    color: transparent;
+}
+QProgressBar::chunk {
+    background-color: #7c9aff;
+    border-radius: 4px;
+}
+QProgressBar#cpuBar::chunk {
+    background-color: #7c9aff;
+}
+QProgressBar#memBar::chunk {
+    background-color: #a78bfa;
+}
+QProgressBar#procMemBar::chunk {
+    background-color: #4ade80;
+}
+"""
