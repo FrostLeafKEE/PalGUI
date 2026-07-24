@@ -734,3 +734,83 @@ QProgressBar#procMemBar::chunk {
     background-color: #4ade80;
 }
 """
+
+BTN_PRIMARY_QSS = """
+QPushButton {
+    background-color: #312e81;
+    color: #a5b4fc;
+    border: 1px solid #6366f1;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 20px;
+}
+QPushButton:hover {
+    background-color: #3730a3;
+    color: #c7d2fe;
+    border: 1px solid #818cf8;
+}
+QPushButton:pressed {
+    background-color: #1e1b4b;
+}
+QPushButton:disabled {
+    background-color: #1a1c2a;
+    color: #4a4e68;
+    border: 1px solid #2e3148;
+}
+"""
+
+PLAYER_TABLE_QSS = """
+QTableWidget {
+    background-color: #0c0e16;
+    color: #e2e4f0;
+    border: 1px solid #2e3148;
+    border-radius: 10px;
+    gridline-color: #1e2030;
+    font-size: 13px;
+}
+QTableWidget::item {
+    padding: 8px 12px;
+    border: none;
+}
+QTableWidget::item:selected {
+    background-color: #252840;
+    color: #7c9aff;
+}
+QTableWidget::item:alternate {
+    background-color: #13151f;
+}
+QHeaderView::section {
+    background-color: #181a24;
+    color: #a5a8c0;
+    border: none;
+    border-bottom: 1px solid #2e3148;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+"""
+
+BACKUP_STATUS_QSS = """
+QLabel {
+    color: #6b6f8a;
+    font-size: 12px;
+    padding-left: 4px;
+}
+"""
+
+BACKUP_SUCCESS_QSS = """
+QLabel {
+    color: #4ade80;
+    font-size: 12px;
+    padding-left: 4px;
+}
+"""
+
+BACKUP_ERROR_QSS = """
+QLabel {
+    color: #f87171;
+    font-size: 12px;
+    padding-left: 4px;
+}
+"""

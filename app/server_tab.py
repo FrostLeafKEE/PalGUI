@@ -10,11 +10,13 @@
 
 import os
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 import psutil
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QProcess, QTimer
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -23,6 +25,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QSpinBox,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -30,6 +33,9 @@ from PyQt6.QtWidgets import (
 
 from app.server_process import ServerProcess, find_server_executable
 from app.theme import (
+    BACKUP_STATUS_QSS,
+    BACKUP_SUCCESS_QSS,
+    BACKUP_ERROR_QSS,
     BTN_START_QSS,
     BTN_STOP_QSS,
     BTN_STARTING_QSS,
@@ -154,6 +160,7 @@ class ServerTab(QWidget):
         self._build_path_group(left)
         self._build_control_group(left)
         self._build_update_group(left)
+        self._build_backup_group(left)
         self._build_console_group(left)
 
         root.addLayout(left, 1)
@@ -268,6 +275,131 @@ class ServerTab(QWidget):
         update_layout.addLayout(update_btn_row)
 
         parent_layout.addWidget(update_group)
+
+    def _build_backup_group(self, parent_layout):
+        backup_group = QGroupBox("  存档备份")
+        backup_layout = QVBoxLayout(backup_group)
+        backup_layout.setSpacing(10)
+
+        # 备份目录选择
+        backup_dir_row = QHBoxLayout()
+        backup_dir_row.setSpacing(10)
+
+        self._backup_dir_display = QLineEdit()
+        self._backup_dir_display.setReadOnly(True)
+        self._backup_dir_display.setPlaceholderText("  选择备份保存目录...")
+        self._backup_dir_display.setStyleSheet(PATH_DISPLAY_QSS)
+
+        self._btn_backup_dir = QPushButton("  选择目录")
+        self._btn_backup_dir.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_backup_dir.setStyleSheet(BTN_SECONDARY_QSS)
+        self._btn_backup_dir.clicked.connect(self._on_select_backup_dir)
+
+        backup_dir_row.addWidget(self._backup_dir_display, 1)
+        backup_dir_row.addWidget(self._btn_backup_dir)
+        backup_layout.addLayout(backup_dir_row)
+
+        # 自动备份设置
+        auto_backup_row = QHBoxLayout()
+        auto_backup_row.setSpacing(12)
+
+        self._auto_backup_cb = QCheckBox("  启用自动备份")
+        self._auto_backup_cb.setStyleSheet("QCheckBox { color: #a5a8c0; font-size: 13px; }")
+        self._auto_backup_cb.stateChanged.connect(self._on_auto_backup_changed)
+
+        self._backup_interval_spin = QSpinBox()
+        self._backup_interval_spin.setRange(1, 1440)
+        self._backup_interval_spin.setValue(60)
+        self._backup_interval_spin.setSuffix(" 分钟")
+        self._backup_interval_spin.setToolTip("自动备份间隔（分钟）")
+        self._backup_interval_spin.setStyleSheet("QSpinBox { background-color: #13151f; color: #e2e4f0; border: 1px solid #2e3148; border-radius: 6px; padding: 4px 8px; font-size: 13px; }")
+        self._backup_interval_spin.setEnabled(False)
+
+        auto_backup_row.addWidget(self._auto_backup_cb)
+        auto_backup_row.addWidget(self._backup_interval_spin)
+        auto_backup_row.addStretch()
+        backup_layout.addLayout(auto_backup_row)
+
+        # 手动备份按钮
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
+
+        self._btn_backup = QPushButton("  立即备份")
+        self._btn_backup.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_backup.setStyleSheet(BTN_SECONDARY_QSS)
+        self._btn_backup.clicked.connect(self._on_manual_backup)
+
+        self._lbl_backup_status = QLabel("")
+        self._lbl_backup_status.setStyleSheet(BACKUP_STATUS_QSS)
+
+        btn_row.addWidget(self._btn_backup)
+        btn_row.addWidget(self._lbl_backup_status)
+        btn_row.addStretch()
+        backup_layout.addLayout(btn_row)
+
+        parent_layout.addWidget(backup_group)
+
+        # 自动备份定时器
+        self._backup_timer = QTimer(self)
+        self._backup_timer.timeout.connect(self._do_backup)
+        self._backup_dir: str = ""
+
+    @pyqtSlot()
+    def _on_select_backup_dir(self):
+        start_dir = self._backup_dir if self._backup_dir else self._server_path or "C:\\"
+        folder = QFileDialog.getExistingDirectory(
+            self, "选择备份保存目录", start_dir
+        )
+        if folder:
+            self._backup_dir = folder
+            self._backup_dir_display.setText(folder)
+
+    @pyqtSlot()
+    def _on_manual_backup(self):
+        self._do_backup()
+
+    @pyqtSlot(int)
+    def _on_auto_backup_changed(self, state):
+        enabled = state == Qt.CheckState.Checked.value
+        self._backup_interval_spin.setEnabled(enabled)
+        if enabled:
+            interval_minutes = self._backup_interval_spin.value()
+            self._backup_timer.start(interval_minutes * 60 * 1000)
+            self._lbl_backup_status.setText(f"  自动备份已启用（每 {interval_minutes} 分钟）")
+            self._lbl_backup_status.setStyleSheet(BACKUP_SUCCESS_QSS)
+        else:
+            self._backup_timer.stop()
+            self._lbl_backup_status.setText("  自动备份已关闭")
+            self._lbl_backup_status.setStyleSheet(BACKUP_STATUS_QSS)
+
+    def _do_backup(self):
+        if not self._server_path:
+            self._lbl_backup_status.setText("  请先设置服务器路径")
+            self._lbl_backup_status.setStyleSheet(BACKUP_ERROR_QSS)
+            return
+        if not self._backup_dir:
+            self._lbl_backup_status.setText("  请先选择备份目录")
+            self._lbl_backup_status.setStyleSheet(BACKUP_ERROR_QSS)
+            return
+
+        save_dir = os.path.join(self._server_path, "Pal", "Saved", "SaveGames")
+        if not os.path.isdir(save_dir):
+            self._lbl_backup_status.setText("  未找到存档目录")
+            self._lbl_backup_status.setStyleSheet(BACKUP_ERROR_QSS)
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_name = f"PalWorld_Backup_{timestamp}"
+        backup_dest = os.path.join(self._backup_dir, backup_name)
+
+        try:
+            shutil.copytree(save_dir, backup_dest)
+            self._lbl_backup_status.setText(f"  备份成功：{backup_name}")
+            self._lbl_backup_status.setStyleSheet(BACKUP_SUCCESS_QSS)
+            self._append_console(f"[备份] 存档已备份到：{backup_dest}\n")
+        except Exception as e:
+            self._lbl_backup_status.setText(f"  备份失败：{e}")
+            self._lbl_backup_status.setStyleSheet(BACKUP_ERROR_QSS)
 
     def _build_console_group(self, parent_layout):
         console_group = QGroupBox("  输出日志")
